@@ -125,10 +125,18 @@ async function main() {
     { movieIndex: 2, screen: 'Hall C', dayOffset: 1, hour: 18, price: 100 },
   ];
 
+  const now = new Date();
+
   for (const s of showtimes) {
-    const startTime = new Date(baseDate);
+    let startTime = new Date(baseDate);
     startTime.setDate(startTime.getDate() + s.dayOffset);
     startTime.setHours(s.hour, 0, 0, 0);
+
+    // เลื่อนไปวันถัดไปจนกว่าจะเป็นเวลาอนาคต
+    // (กันกรณี Seed ตอนเย็น แต่รอบฉายนั้นเลยเวลาฉายไปแล้ว)
+    while (startTime <= now) {
+      startTime.setDate(startTime.getDate() + 1);
+    }
 
     const showDate = new Date(startTime);
     showDate.setHours(0, 0, 0, 0);

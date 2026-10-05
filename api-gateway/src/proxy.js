@@ -15,7 +15,11 @@
 
 const axios = require('axios');
 const config = require('./config');
-const { CONTENT_ROUTES, BOOKING_ROUTES } = require('./config/routes');
+const {
+  CONTENT_ROUTES,
+  ADMIN_ROUTES,
+  BOOKING_ROUTES,
+} = require('./config/routes');
 
 const backend = axios.create({
   baseURL: config.BACKEND_INTERNAL_URL,
@@ -35,18 +39,22 @@ function forwardHeaders(req) {
  * @param {string} publicPrefix Path ภายนอก เช่น /api/movies
  * @param {string} backendPrefix Path ภายหลัง เช่น /movies
  */
-function createProxyHandler(backendPrefix) {
+function createProxyHandler(publicPrefix, backendPrefix) {
   return async function proxyHandler(req, res) {
     try {
       // ---- แปลง Path : /api/movies/1 → /movies/1 ----
-      // ใช้ req.originalUrl เพราะต้องได้ Path เต็ม (รวม query string)
+      // ตัด publicPrefix (เช่น /api/movies) ออก แล้วเติม backendPrefix (เช่น /movies) แทน
       const fullPath = req.originalUrl.split('?')[0];
       const query = req.originalUrl.includes('?')
         ? req.originalUrl.slice(req.originalUrl.indexOf('?'))
         : '';
-      const backendPath = fullPath.replace(backendPrefix, '') || '/';
 
-      const targetUrl = `${backendPrefix}${backendPath}${query}`;
+      // ส่วนที่เหลือหลังตัด prefix เช่น /1/seats
+      const restPath = fullPath.startsWith(publicPrefix)
+        ? fullPath.slice(publicPrefix.length)
+        : fullPath;
+
+      const targetUrl = `${backendPrefix}${restPath}${query}`;
       const requestConfig = {
         headers: forwardHeaders(req),
         params: req.query,
@@ -103,7 +111,7 @@ function createProxyHandler(backendPrefix) {
  * @param {import('express').Express} app
  */
 function registerContentRoutes(app) {
-  const allRoutes = [...CONTENT_ROUTES, ...BOOKING_ROUTES];
+  const allRoutes = [...CONTENT_ROUTES, ...ADMIN_ROUTES, ...BOOKING_ROUTES];
   const registered = new Set();
 
   console.log('\n📋 ตารางการส่งต่อ CONTENT API (ยึดตามโครงสร้างระบบจองตั๋วหนัง) :');
@@ -115,7 +123,15 @@ function registerContentRoutes(app) {
     if (registered.has(key)) continue;
     registered.add(key);
 
-    app[route.method](`${route.publicPrefix}/*`, createProxyHandler(route.backendPrefix));
+    const handler = createProxyHandler(route.publicPrefix, route.backendPrefix);
+
+    // ลงทะเบียน 2 แบบ เพื่อให้รองรับทั้ง Path แบบไม่มี slash ท้าย และแบบมี slash
+    //   1) /api/movies      → เรียกรายการหนังทั้งหมด
+    //   2) /api/movies/*    → เรียกรายละเอียด เช่น /api/movies/1
+    // หมายเหตุ : Express 4 จะไม่จับคู่ '/api/movies' กับ pattern '/api/movies/*'
+    //            จึงต้องลงทะเบียนแยกกัน
+    app[route.method](route.publicPrefix, handler);
+    app[route.method](`${route.publicPrefix}/*`, handler);
 
     console.log(
       `   │ ${route.method.toUpperCase().padEnd(6)} ${route.publicPrefix.padEnd(28)} → ${route.backendPrefix.padEnd(26)} │`

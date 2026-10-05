@@ -87,7 +87,13 @@ app.get('/api', (req, res) => {
         'DELETE /api/showtimes/:id         → ลบรอบฉาย (ADMIN)',
         'POST   /api/bookings              → จองตั๋ว (USER)',
         'GET    /api/bookings              → ประวัติการจองของฉัน (USER)',
+        'GET    /api/bookings/:id          → รายละเอียดการจองของฉัน (USER)',
         'DELETE /api/bookings/:id          → ยกเลิกการจอง (USER)',
+        'GET    /api/admin/dashboard       → แดชบอร์ดสรุประบบ (ADMIN)',
+        'GET    /api/admin/users           → รายชื่อผู้ใช้ทั้งหมด (ADMIN)',
+        'PUT    /api/admin/users/:id/role  → เปลี่ยนบทบาทผู้ใช้ (ADMIN)',
+        'DELETE /api/admin/users/:id       → ลบผู้ใช้ (ADMIN)',
+        'GET    /api/admin/bookings        → การจองทั้งระบบ (ADMIN)',
       ],
     },
   });

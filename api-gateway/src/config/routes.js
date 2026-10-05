@@ -125,6 +125,43 @@ const CONTENT_ROUTES = [
 ];
 
 /**
+ * ADMIN API — ระบบหลังบ้าน (เฉพาะ ADMIN เท่านั้น)
+ * ส่งต่อแบบ Pass-through ตามโครงสร้างของระบบจองตั๋วหนัง
+ */
+const ADMIN_ROUTES = [
+  {
+    method: 'get',
+    publicPrefix: '/api/admin/dashboard',
+    backendPrefix: '/admin/dashboard',
+    description: 'ADMIN — แดชบอร์ดสรุปข้อมูลระบบทั้งหมด',
+  },
+  {
+    method: 'get',
+    publicPrefix: '/api/admin/users',
+    backendPrefix: '/admin/users',
+    description: 'ADMIN — ดูรายชื่อผู้ใช้ทั้งหมด',
+  },
+  {
+    method: 'put',
+    publicPrefix: '/api/admin/users',
+    backendPrefix: '/admin/users',
+    description: 'ADMIN — เปลี่ยนบทบาทของผู้ใช้',
+  },
+  {
+    method: 'delete',
+    publicPrefix: '/api/admin/users',
+    backendPrefix: '/admin/users',
+    description: 'ADMIN — ลบผู้ใช้',
+  },
+  {
+    method: 'get',
+    publicPrefix: '/api/admin/bookings',
+    backendPrefix: '/admin/bookings',
+    description: 'ADMIN — ดูภาพรวมการจองทั้งหมด',
+  },
+];
+
+/**
  * BOOKING API — การจองตั๋วหนัง (ส่วนที่ต้องแก้ไข Path เพิ่มเติม)
  * เนื่องจาก Backend ใช้ /bookings แต่ต้องการ Path ที่สื่อถึง "ตั๋วหนัง"
  */
@@ -149,4 +186,9 @@ const BOOKING_ROUTES = [
   },
 ];
 
-module.exports = { AUTH_ROUTES, CONTENT_ROUTES, BOOKING_ROUTES };
+module.exports = {
+  AUTH_ROUTES,
+  CONTENT_ROUTES,
+  ADMIN_ROUTES,
+  BOOKING_ROUTES,
+};

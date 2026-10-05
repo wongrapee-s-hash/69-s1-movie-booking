@@ -142,8 +142,11 @@ Path ของกลุ่มกำหนดให้ตรงกับ Reposito
 | `/api/bookings` | `POST` | **จองตั๋วหนัง** | USER |
 | `/api/bookings` | `GET` | ประวัติการจองของตัวเอง | USER |
 | `/api/bookings/:id` | `DELETE` | ยกเลิกการจอง | USER |
+| `/api/bookings/:id` | `GET` | รายละเอียดการจองของตัวเอง | USER |
 | `/api/admin/dashboard` | `GET` | แดชบอร์ดสรุประบบ | ADMIN |
 | `/api/admin/users` | `GET` | ดูรายชื่อผู้ใช้ทั้งหมด | ADMIN |
+| `/api/admin/users/:id/role` | `PUT` | เปลี่ยนบทบาทของผู้ใช้ | ADMIN |
+| `/api/admin/users/:id` | `DELETE` | ลบผู้ใช้ | ADMIN |
 | `/api/admin/bookings` | `GET` | ดูการจองทั้งหมดของระบบ | ADMIN |
 
 ---
@@ -466,6 +469,9 @@ curl -X GET http://localhost:8080/api/showtimes/1/seats
 
 #### ⑥ จองตั๋วหนัง (ต้องเป็น USER)
 
+> `seatIds` คือค่า `id` ของที่นั่งที่ได้จากขั้นตอน ⑤ ไม่ใช่รหัสที่นั่ง (`A1`, `A2`)
+> และต้องเป็นที่นั่งของรอบฉายเดียวกัน
+
 ```bash
 curl -X POST http://localhost:8080/api/bookings \
   -H "Content-Type: application/json" \
@@ -586,18 +592,14 @@ curl -X POST http://localhost:8080/api/auth/forgot-password \
 ```json
 {
   "success": true,
-  "message": "หากอีเมลนี้มีอยู่ในระบบ ระบบได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว",
-  "data": {
-    "token": "a1b2c3d4e5f6...",
-    "resetLink": "http://localhost:8080/reset-password?token=a1b2c3d4e5f6...",
-    "expiresAt": "2026-10-06T12:15:00.000Z",
-    "mailpitUrl": "http://localhost:8025",
-    "hint": "เปิดดูอีเมลและ Token ได้ที่ Mailpit พอร์ต 8025"
-  }
+  "message": "หากอีเมลนี้มีอยู่ในระบบ ระบบได้ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว"
 }
 ```
 
-> **หมายเหตุ:** ถ้า Request ไปด้วย Email ที่ไม่มีอยู่ในระบบ
+> **หมายเหตุ 1 :** ต้องดึง Token จากอีเมลใน Mailpit เท่านั้น เพราะระบบตั้งค่า
+> `NODE_ENV=production` ไว้ เพื่อไม่ให้ Token หลุดกลับมาใน HTTP Response
+>
+> **หมายเหตุ 2 :** ถ้า Request ไปด้วย Email ที่ไม่มีอยู่ในระบบ
 > ระบบจะตอบกลับเหมือนกันทุกประการ เพื่อไม่ให้เปิดเผยว่า Email ใดมีอยู่จริง
 
 ### ขั้นตอนที่ 3 : ดูอีเมลใน Mailpit
@@ -607,10 +609,15 @@ curl -X POST http://localhost:8080/api/auth/forgot-password \
 จะพบอีเมลใหม่ 1 ฉบับ หัวข้อ *"🔐 รีเซ็ตรหัสผ่าน — ระบบจองตั๋วหนัง"*
 
 คลิกเปิดอีเมล จะเห็นปุ่ม **"ตั้งรหัสผ่านใหม่"** และลิงก์ที่มี Token อยู่
+(หากอ่านจากเมนู **Message → Source** จะเห็น Token ในรูป
+`http://localhost:8080/reset-password?token=<64 ตัวอักษร>` ชัดเจนที่สุด)
 
 ### ขั้นตอนที่ 4 : ตั้งรหัสผ่านใหม่
 
-นำ Token จากอีเมลมาใช้
+นำ Token จากอีเมลมาใช้ กับ `POST /api/auth/reset-password`
+
+> ลิงก์ในอีเมลชี้ไปที่หน้าเว็บ `reset-password` ซึ่งเป็นหน้า Frontend
+> ระบบนี้เป็น API เท่านั้น จึงต้องนำ Token มาเรียกผ่าน API ตามตัวอย่างด้านล่าง
 
 ```bash
 curl -X POST http://localhost:8080/api/auth/reset-password \
