@@ -1,0 +1,178 @@
+# =============================================================================
+# docker-compose.yml
+# ระบบจองตั๋วหนัง (Movie Ticket Booking System)
+# Backend: Express.js + Prisma + PostgreSQL (แทน Strapi / Payload CMS)
+# รองรับเงื่อนไขอาจารย์: API Gateway แมป Auth Path ให้ตรง 69-s1-app
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. gitea-db : PostgreSQL สำหรับเก็บข้อมูลของ Gitea (Git Server)
+  # ---------------------------------------------------------------------------
+  gitea-db:
+    image: postgres:14-alpine
+    container_name: gitea-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${GITEA_DB_USER}
+      POSTGRES_PASSWORD: ${GITEA_DB_PASSWORD}
+      POSTGRES_DB: ${GITEA_DB_NAME}
+    volumes:
+      - gitea_db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GITEA_DB_USER} -d ${GITEA_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # 2. gitea-server : Gitea = Git Server (หน้าที่เก็บ Source Code ของกลุ่ม)
+  #    ไม่เกี่ยวข้องกับ Business Logic ของระบบจองตั๋วหนัง
+  # ---------------------------------------------------------------------------
+  gitea-server:
+    image: gitea/gitea:latest
+    container_name: gitea-server
+    restart: unless-stopped
+    depends_on:
+      gitea-db:
+        condition: service_healthy
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=gitea-db:5432
+      - DB_NAME=${GITEA_DB_NAME}
+      - DB_USER=${GITEA_DB_USER}
+      - DB_PASSWD=${GITEA_DB_PASSWORD}
+      - USER_UID=1000
+      - USER_GID=1000
+      - RUN_MODE=prod
+      - ROOT_URL=${GITEA_ROOT_URL}
+      - SSH_DOMAIN=${SSH_DOMAIN}
+      - SSH_PORT=${GITEA_SSH_PORT}
+      - HTTP_PORT=3000
+      # ตั้งค่า SMTP ให้ส่งอีเมลเข้า Mailpit (ใช้ทดสอบ Forgot Password ของ Gitea)
+      - MAILER_TYPE=smtp
+      - SMTP_ADDR=mailpit
+      - SMTP_PORT=1025
+      - SMTP_FROM=${MAIL_FROM}
+      - DISABLE_REGISTRATION=false
+      - ENABLE_SWAGGER=true
+    ports:
+      - "3000:3000"
+      - "${GITEA_SSH_PORT}:22"
+    volumes:
+      - gitea_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # 3. mailpit : ดักจับอีเมลทั้งหมด (ทดสอบ Forgot Password โดยไม่ต้องใช้ SMTP จริง)
+  # ---------------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      - MP_SMTP_AUTH_ACCEPT_ANY=1
+      - MP_SMTP_AUTH_ALLOW_INSECURE=1
+      - MP_UI_AUTH_REQUIRED=false
+    networks:
+      - app-network
+
+  # ---------------------------------------------------------------------------
+  # 4. app-db : PostgreSQL สำหรับฐานข้อมูลระบบจองตั๋วหนัง (แยกจาก Gitea)
+  # ---------------------------------------------------------------------------
+  app-db:
+    image: postgres:14-alpine
+    container_name: app-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${APP_DB_USER}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD}
+      POSTGRES_DB: ${APP_DB_NAME}
+    volumes:
+      - app_db_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${APP_DB_USER} -d ${APP_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # 5. backend : ระบบจองตั๋วหนัง (Express.js + Prisma)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: unless-stopped
+    depends_on:
+      app-db:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DATABASE_URL=postgresql://${APP_DB_USER}:${APP_DB_PASSWORD}@app-db:5432/${APP_DB_NAME}?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - RESET_TOKEN_TTL_MINUTES=${RESET_TOKEN_TTL_MINUTES}
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - MAIL_FROM=${MAIL_FROM}
+      - GATEWAY_PUBLIC_URL=${GATEWAY_PUBLIC_URL}
+    ports:
+      - "${BACKEND_PORT}:4000"
+    networks:
+      - app-network
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node src/index.js"
+
+  # ---------------------------------------------------------------------------
+  # 6. api-gateway : API Gateway ทำหน้าที่แมป Path ตามเงื่อนไข 69-s1-app
+  # ---------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - BACKEND_INTERNAL_URL=http://backend:4000
+      - GATEWAY_PUBLIC_URL=${GATEWAY_PUBLIC_URL}
+    ports:
+      - "${GATEWAY_PORT}:8080"
+    networks:
+      - app-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  gitea_db_data:
+    driver: local
+  gitea_data:
+    driver: local
+  app_db_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  app-network:
+    driver: bridge
