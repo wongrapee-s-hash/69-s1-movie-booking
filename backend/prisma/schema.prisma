@@ -1,0 +1,185 @@
+// =============================================================================
+// prisma/schema.prisma
+// โครงสร้างฐานข้อมูลของระบบจองตั๋วหนัง
+// Generator: Prisma ORM  |  Database: PostgreSQL
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// Role : แบ่งสิทธิ์ Admin กับ User ตามเงื่อนไขของอาจารย์
+// =============================================================================
+enum Role {
+  ADMIN // ดูแลระบบหลังบ้านเท่านั้น (จัดการหนัง/รอบฉาย/ผู้ใช้)
+  USER // ผู้ใช้ทั่วไป (ดูหนัง + จองตั๋ว) - ห้ามทำ Operation ของ Admin
+}
+
+// =============================================================================
+// สถานะการจอง
+// =============================================================================
+enum BookingStatus {
+  CONFIRMED // จองสำเร็จ
+  CANCELLED // ยกเลิกการจอง
+}
+
+// =============================================================================
+// ประเภทที่นั่ง
+// =============================================================================
+enum SeatType {
+  NORMAL // ที่นั่งธรรมดา
+  PREMIUM // ที่นั่งพรีเมียม
+}
+
+// =============================================================================
+// User : ผู้ใช้งานระบบ
+// =============================================================================
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  username  String   @unique
+  password  String // bcrypt hash
+  fullName  String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ความสัมพันธ์
+  bookings Booking[]
+  tokens   PasswordResetToken[]
+
+  @@map("users")
+}
+
+// =============================================================================
+// PasswordResetToken : เก็บ Token สำหรับ Forgot Password
+// ใช้ยืนยันตัวตนอีกครั้งก่อนเปลี่ยนรหัสผ่าน
+// =============================================================================
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  expiresAt DateTime
+  usedAt    DateTime? // ใช้แล้วหรือยัง (ป้องกันการใช้ Token ซ้ำ)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+// =============================================================================
+// Movie : ข้อมูลหนัง
+// จัดการโดย ADMIN เท่านั้น
+// =============================================================================
+model Movie {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  genre       String?
+  duration    Int // ความยาว (นาที)
+  rating      String? // PG-13, 4K ฯลฯ
+  releaseDate DateTime @default(now())
+  posterUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  showtimes Showtime[]
+
+  @@index([title])
+  @@map("movies")
+}
+
+// =============================================================================
+// Showtime : รอบฉายของหนัง
+// จัดการโดย ADMIN เท่านั้น
+// =============================================================================
+model Showtime {
+  id        Int      @id @default(autoincrement())
+  movieId   Int
+  screen    String // ชื่อห้องฉาย เช่น "Hall A"
+  showDate  DateTime // วันที่ฉาย
+  startTime DateTime // เวลาเริ่ม
+  price     Float // ราคาตั๋ว
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movie   Movie            @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  seats   Seat[]
+  bookings Booking[]
+
+  @@index([movieId])
+  @@index([showDate])
+  @@map("showtimes")
+}
+
+// =============================================================================
+// Seat : ที่นั่งภายในรอบฉาย
+// จัดการโดย ADMIN เท่านั้น
+// =============================================================================
+model Seat {
+  id         Int      @id @default(autoincrement())
+  showtimeId Int
+  seatCode   String // รหัสที่นั่ง เช่น "A1", "A2"
+  rowLabel   String // แถว เช่น "A"
+  seatNumber Int // หมายเลขที่นั่งในแถว
+  seatType   SeatType @default(NORMAL)
+
+  showtime Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+
+  // ความสัมพันธ์กับการจอง
+  bookingSeats BookingSeat[]
+
+  // บังคับให้ที่นั่งเดียวในหนึ่งรอบฉาย ไม่ซ้ำ
+  @@unique([showtimeId, seatCode])
+  @@index([showtimeId])
+  @@map("seats")
+}
+
+// =============================================================================
+// Booking : การจองตั๋วหนัง (Core ของระบบ)
+// =============================================================================
+model Booking {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  showtimeId  Int
+  totalPrice  Float
+  status      BookingStatus @default(CONFIRMED)
+  bookingCode String        @unique // รหัสการจอง เช่น "BK-20260101-0001"
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  showtime Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  seats    BookingSeat[]
+
+  @@index([userId])
+  @@index([showtimeId])
+  @@map("bookings")
+}
+
+// =============================================================================
+// BookingSeat : ที่นั่งที่ถูกจอง (ตารางเชื่อม Many-to-Many)
+// unique(showtimeId, seatId) = ป้องกันการจองที่นั่งซ้ำในรอบเดียวกัน
+// =============================================================================
+model BookingSeat {
+  id        Int      @id @default(autoincrement())
+  bookingId Int
+  seatId    Int
+  showtimeId Int
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seat     Seat    @relation(fields: [seatId], references: [id], onDelete: Cascade)
+
+  @@unique([showtimeId, seatId])
+  @@index([bookingId])
+  @@map("booking_seats")
+}
