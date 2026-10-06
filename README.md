@@ -804,3 +804,4 @@ git push origin <ชื่อ branch>
 
 ทั้งระบบทำงานภายใน **Docker Compose** พร้อม **Gitea** (Git Server) และ **Mailpit** (ดักอีเมล)
 โดยแต่ละส่วนมีหน้าที่แยกกันอย่างชัดเจน พร้อมระบบสิทธิ์ Admin / User ที่บังคับใช้จริงในระดับโค้ด
+> **Mirror** : Repository ���١ Push ��� GitHub ��� Gitea ������ѹ���¤��������``git push``
