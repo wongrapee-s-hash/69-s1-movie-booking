@@ -802,6 +802,10 @@ git commit -m "ข้อความตามรูปแบบ Conventional Com
 git push origin <ชื่อ branch>
 ```
 
+> **หมายเหตุ :** `origin` ถูกตั้ง push URL ไว้ 2 ที่ (GitHub + Gitea)
+> ดังนั้นคำสั่ง `git push` ครั้งเดียวจะส่งขึ้น **ทั้งสอง Repository พร้อมกัน**
+> เมื่อ merge เข้า `main` แล้วใช้เพียง `git push` โดยไม่ต้องระบุ remote
+
 4. **ห้าม Commit ข้อมูลลับ**
    - ไฟล์ `.env` ถูกใส่ใน `.gitignore` แล้ว
    - ให้ส่งเฉพาะไฟล์ `.env.example` ที่ไม่มีรหัสผ่านจริง
