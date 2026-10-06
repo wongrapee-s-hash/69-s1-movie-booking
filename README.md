@@ -256,21 +256,26 @@ Path ของกลุ่มกำหนดให้ตรงกับ Reposito
 ```text
 gitea-pros1/
 ├── docker-compose.yml
-├── .env
+├── .env                      # ไม่ถูก Commit (อยู่ใน .gitignore)
 ├── .env.example
 ├── .gitignore
 ├── README.md
 │
 ├── backend/                          # ระบบจองตั๋วหนัง
 │   ├── Dockerfile
+│   ├── .dockerignore
 │   ├── package.json
+│   ├── package-lock.json             # ล็อก version ให้เท่ากันทุกเครื่อง
 │   ├── prisma/
 │   │   ├── schema.prisma
-│   │   └── seed.js
+│   │   ├── seed.js
+│   │   └── migrations/               # ใช้โดย prisma migrate deploy
+│   │       ├── migration_lock.toml
+│   │       └── 20260101000000_init/
+│   │           └── migration.sql
 │   └── src/
 │       ├── index.js
 │       ├── app.js
-│       ├── config/       (ไม่มี - ใช้ env โดยตรง)
 │       ├── lib/
 │       │   ├── prisma.js
 │       │   └── mailer.js
@@ -288,7 +293,9 @@ gitea-pros1/
 │
 └── api-gateway/                      # API Gateway
     ├── Dockerfile
+    ├── .dockerignore
     ├── package.json
+    ├── package-lock.json
     └── src/
         ├── index.js
         ├── app.js
@@ -373,6 +380,15 @@ docker compose down -v
 # เริ่มระบบใหม่
 docker compose up -d
 ```
+
+> ⚠️ **หมายเหตุ `docker compose down -v`** — จะลบข้อมูลของ **ทั้งระบบจองตั๋วหนังและ Gitea**
+> ข้อมูลจอง/ผู้ใช้จะถูก Seed ใหม่ให้ตามตารางบัญชีด้านบนอัตโนมัติ
+> แต่ **Gitea ต้องตั้งค่า Install Wizard ใหม่** และสร้าง Repository ใหม่อีกครั้ง
+> ถ้าต้องการรีเซ็ตข้อมูลระบบจองตั๋วหนังอย่างเดียว ให้รัน seed ซ้ำแทน:
+>
+> ```bash
+> docker compose exec -T backend npx prisma db seed
+> ```
 
 ---
 
@@ -658,7 +674,7 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 | สมาชิก | พื้นที่รับผิดชอบ | ไฟล์ที่ดูแล |
 |---|---|---|
-| **สมาชิกคนที่ 1** | Infrastructure และระบบหลังบ้าน | `docker-compose.yml`, `.env`, `.gitignore`, `README.md`, `gitea/` |
+| **สมาชิกคนที่ 1** | Infrastructure และระบบหลังบ้าน | `docker-compose.yml`, `.env`, `.env.example`, `.gitignore`, `README.md`, `backend/.dockerignore`, `api-gateway/.dockerignore` |
 | **สมาชิกคนที่ 2** | Backend และ API Gateway | `backend/` ทั้งหมด, `api-gateway/` ทั้งหมด |
 
 #### รายละเอียดงานของแต่ละคน
@@ -804,4 +820,9 @@ git push origin <ชื่อ branch>
 
 ทั้งระบบทำงานภายใน **Docker Compose** พร้อม **Gitea** (Git Server) และ **Mailpit** (ดักอีเมล)
 โดยแต่ละส่วนมีหน้าที่แยกกันอย่างชัดเจน พร้อมระบบสิทธิ์ Admin / User ที่บังคับใช้จริงในระดับโค้ด
-> **Mirror** : Repository ���١ Push ��� GitHub ��� Gitea ������ѹ���¤��������``git push``
+
+> **Mirror** : Repository นี้ถูก Push ขึ้น GitHub และ Gitea พร้อมกันด้วยคำสั่งเดียว
+>
+> ```bash
+> git push
+> ```

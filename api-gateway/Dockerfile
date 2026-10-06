@@ -5,8 +5,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# ติดตั้ง dependencies ตาม package-lock.json (version ตรงกันทุกเครื่อง)
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 

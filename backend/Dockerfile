@@ -15,9 +15,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# ติดตั้ง dependencies ก่อน (ใช้ cache layer ของ Docker)
+# ติดตั้ง dependencies ตาม package-lock.json (version ตรงกันทุกเครื่อง)
+# npm ci ต้องมี package-lock.json และ fail ถ้า lock กับ package.json ไม่ตรงกัน
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # คัดลอกโค้ดทั้งหมด
 COPY . .

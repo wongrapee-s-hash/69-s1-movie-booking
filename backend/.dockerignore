@@ -1,0 +1,14 @@
+# ไม่ต้อง COPY เข้า image — ติดตั้งด้วย npm ci แทน
+node_modules
+
+# ข้อมูลจริงห้ามเข้า image
+.env
+.env.*
+!.env.example
+
+# ไฟล์จาก OS / Editor
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.log
+.git

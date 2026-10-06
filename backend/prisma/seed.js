@@ -45,7 +45,8 @@ async function main() {
   const adminPassword = await bcrypt.hash('Admin@1234', 10);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@movie.local' },
-    update: {},
+    // รีเซ็ตรหัสผ่านและบทบาททุกครั้ง เพื่อให้บัญชีทดสอบตรงกับ README เสมอ
+    update: { password: adminPassword, role: 'ADMIN' },
     create: {
       email: 'admin@movie.local',
       username: 'admin',
@@ -62,7 +63,8 @@ async function main() {
   const userPassword = await bcrypt.hash('User@1234', 10);
   const user = await prisma.user.upsert({
     where: { email: 'user@movie.local' },
-    update: {},
+    // รีเซ็ตรหัสผ่านและบทบาททุกครั้ง เพื่อให้บัญชีทดสอบตรงกับ README เสมอ
+    update: { password: userPassword, role: 'USER' },
     create: {
       email: 'user@movie.local',
       username: 'user',
